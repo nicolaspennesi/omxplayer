@@ -1,5 +1,5 @@
 /*
- * 
+ *
  *      Copyright (C) 2012 Edgar Hucek
  *
  * This program is free software; you can redistribute it and/or modify
@@ -115,6 +115,7 @@ bool              m_has_audio           = false;
 bool              m_has_subtitle        = false;
 bool              m_gen_log             = false;
 bool              m_loop                = false;
+bool              m_start_paused        = false;
 
 enum{ERROR=-1,SUCCESS,ONEBYTE};
 
@@ -287,10 +288,10 @@ void SetVideoMode(int width, int height, int fpsrate, int fpsscale, FORMAT_3D_T 
   TV_SUPPORTED_MODE_NEW_T *supported_modes = NULL;
   // query the number of modes first
   int max_supported_modes = m_BcmHost.vc_tv_hdmi_get_supported_modes_new(group, NULL, 0, &prefer_group, &prefer_mode);
- 
+
   if (max_supported_modes > 0)
     supported_modes = new TV_SUPPORTED_MODE_NEW_T[max_supported_modes];
- 
+
   if (supported_modes)
   {
     num_modes = m_BcmHost.vc_tv_hdmi_get_supported_modes_new(group,
@@ -322,11 +323,11 @@ void SetVideoMode(int width, int height, int fpsrate, int fpsscale, FORMAT_3D_T 
   score += 0;
       else if(fabs(r - 2.0f*fps) / fps < 0.002f)
   score += 1<<8;
-      else 
+      else
   score += (1<<16) + (1<<20)/r; // bad - but prefer higher framerate
 
       /* Check size too, only choose, bigger resolutions */
-      if(width && height) 
+      if(width && height)
       {
         /* cost of too small a resolution is high */
         score += max((int)(width -w), 0) * (1<<16);
@@ -334,14 +335,14 @@ void SetVideoMode(int width, int height, int fpsrate, int fpsscale, FORMAT_3D_T 
         /* cost of too high a resolution is lower */
         score += max((int)(w-width ), 0) * (1<<4);
         score += max((int)(h-height), 0) * (1<<4);
-      } 
+      }
 
       // native is good
-      if (!tv->native) 
+      if (!tv->native)
         score += 1<<16;
 
       // interlace is bad
-      if (scan_mode != tv->scan_mode) 
+      if (scan_mode != tv->scan_mode)
         score += (1<<16);
 
       // wanting 3D but not getting it is a negative
@@ -356,10 +357,10 @@ void SetVideoMode(int width, int height, int fpsrate, int fpsscale, FORMAT_3D_T 
       float par = get_display_aspect_ratio((HDMI_ASPECT_T)tv->aspect_ratio)*(float)tv->height/(float)tv->width;
       score += fabs(par - 1.0f) * (1<<12);
 
-      /*printf("mode %dx%d@%d %s%s:%x par=%.2f score=%d\n", tv->width, tv->height, 
+      /*printf("mode %dx%d@%d %s%s:%x par=%.2f score=%d\n", tv->width, tv->height,
              tv->frame_rate, tv->native?"N":"", tv->scan_mode?"I":"", tv->code, par, score);*/
 
-      if (score < best_score) 
+      if (score < best_score)
       {
         tv_found = tv;
         best_score = score;
@@ -370,7 +371,7 @@ void SetVideoMode(int width, int height, int fpsrate, int fpsscale, FORMAT_3D_T 
   if(tv_found)
   {
     char response[80];
-    printf("Output mode %d: %dx%d@%d %s%s:%x\n", tv_found->code, tv_found->width, tv_found->height, 
+    printf("Output mode %d: %dx%d@%d %s%s:%x\n", tv_found->code, tv_found->width, tv_found->height,
            tv_found->frame_rate, tv_found->native?"N":"", tv_found->scan_mode?"I":"", tv_found->code);
     if (m_NativeDeinterlace && tv_found->scan_mode)
       vc_gencmd(response, sizeof response, "hvs_update_fields %d", 1);
@@ -570,6 +571,7 @@ int main(int argc, char *argv[])
   const int http_user_agent_opt = 0x301;
   const int lavfdopts_opt   = 0x400;
   const int avdict_opt      = 0x401;
+  const int start_paused    = 0x214;
 
   struct option longopts[] = {
     { "info",         no_argument,        NULL,          'i' },
@@ -596,7 +598,7 @@ int main(int argc, char *argv[])
     { "refresh",      no_argument,        NULL,          'r' },
     { "genlog",       no_argument,        NULL,          'g' },
     { "sid",          required_argument,  NULL,          't' },
-    { "pos",          required_argument,  NULL,          'l' },    
+    { "pos",          required_argument,  NULL,          'l' },
     { "blank",        optional_argument,  NULL,          'b' },
     { "font",         required_argument,  NULL,          font_opt },
     { "italic-font",  required_argument,  NULL,          italic_font_opt },
@@ -619,6 +621,7 @@ int main(int argc, char *argv[])
     { "key-config",   required_argument,  NULL,          key_config_opt },
     { "no-osd",       no_argument,        NULL,          no_osd_opt },
     { "no-keys",      no_argument,        NULL,          no_keys_opt },
+    { "start-paused", no_argument,        NULL,          start_paused },
     { "orientation",  required_argument,  NULL,          orientation_opt },
     { "fps",          required_argument,  NULL,          fps_opt },
     { "live",         no_argument,        NULL,          live_opt },
@@ -649,7 +652,7 @@ int main(int argc, char *argv[])
 
   while ((c = getopt_long(argc, argv, "wiIhvkn:l:o:cslb::pd3:Myzt:rg", longopts, NULL)) != -1)
   {
-    switch (c) 
+    switch (c)
     {
       case 'r':
         m_refresh = true;
@@ -765,6 +768,9 @@ int main(int argc, char *argv[])
         break;
       case no_keys_opt:
         m_no_keys = true;
+        break;
+      case start_paused:
+        m_start_paused = true;
         break;
       case font_opt:
         m_font_path = optarg;
@@ -899,7 +905,7 @@ int main(int argc, char *argv[])
         break;
       case http_user_agent_opt:
         m_user_agent = optarg;
-        break;    
+        break;
       case lavfdopts_opt:
         m_lavfdopts = optarg;
         break;
@@ -978,7 +984,7 @@ int main(int argc, char *argv[])
       m_has_external_subtitles = true;
     }
   }
-    
+
   bool m_audio_extension = false;
   const CStdString m_musicExtensions = ".nsv|.m4a|.flac|.aac|.strm|.pls|.rm|.rma|.mpa|.wav|.wma|.ogg|.mp3|.mp2|.m3u|.mod|.amf|.669|.dmf|.dsm|.far|.gdm|"
                  ".imf|.it|.m15|.med|.okt|.s3m|.stm|.sfx|.ult|.uni|.xm|.sid|.ac3|.dts|.cue|.aif|.aiff|.wpl|.ape|.mac|.mpc|.mp+|.mpp|.shn|.zip|.rar|"
@@ -1076,7 +1082,7 @@ int main(int argc, char *argv[])
 
   if(m_audio_index_use > 0)
     m_omx_reader.SetActiveStream(OMXSTREAM_AUDIO, m_audio_index_use-1);
-          
+
   if(m_has_video && m_refresh)
   {
     memset(&tv_state, 0, sizeof(TV_DISPLAY_STATE_T));
@@ -1189,7 +1195,7 @@ int main(int argc, char *argv[])
 
     double now = m_av_clock->GetAbsoluteClock();
     bool update = false;
-    if (m_last_check_time == 0.0 || m_last_check_time + DVD_MSEC_TO_TIME(20) <= now) 
+    if (m_last_check_time == 0.0 || m_last_check_time + DVD_MSEC_TO_TIME(20) <= now)
     {
       update = true;
       m_last_check_time = now;
@@ -1691,7 +1697,7 @@ int main(int argc, char *argv[])
         video_fifo_low = m_has_video && video_fifo < threshold;
         video_fifo_high = !m_has_video || (video_pts != DVD_NOPTS_VALUE && video_fifo > m_threshold);
       }
-      CLog::Log(LOGDEBUG, "Normal M:%.0f (A:%.0f V:%.0f) P:%d A:%.2f V:%.2f/T:%.2f (%d,%d,%d,%d) A:%d%% V:%d%% (%.2f,%.2f)\n", stamp, audio_pts, video_pts, m_av_clock->OMXIsPaused(), 
+      CLog::Log(LOGDEBUG, "Normal M:%.0f (A:%.0f V:%.0f) P:%d A:%.2f V:%.2f/T:%.2f (%d,%d,%d,%d) A:%d%% V:%d%% (%.2f,%.2f)\n", stamp, audio_pts, video_pts, m_av_clock->OMXIsPaused(),
         audio_pts == DVD_NOPTS_VALUE ? 0.0:audio_fifo, video_pts == DVD_NOPTS_VALUE ? 0.0:video_fifo, m_threshold, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high,
         m_player_audio.GetLevel(), m_player_video.GetLevel(), m_player_audio.GetDelay(), (float)m_player_audio.GetCacheTotal());
 
@@ -1737,8 +1743,19 @@ int main(int argc, char *argv[])
       {
         if (m_av_clock->OMXIsPaused())
         {
-          CLog::Log(LOGDEBUG, "Resume %.2f,%.2f (%d,%d,%d,%d) EOF:%d PKT:%p\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_omx_reader.IsEof(), m_omx_pkt);
-          m_av_clock->OMXResume();
+          if (!m_start_paused)
+          {
+            CLog::Log(LOGDEBUG, "Resume %.2f,%.2f (%d,%d,%d,%d) EOF:%d PKT:%p\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_omx_reader.IsEof(), m_omx_pkt);
+            m_av_clock->OMXResume();
+          }
+          else
+          {
+            CLog::Log(LOGDEBUG, "start-paused(%d)\n", m_start_paused);
+            m_av_clock->OMXResume();
+            m_Pause=true;
+            m_start_paused=false;
+            m_av_clock->OMXPause();
+          }
         }
       }
       else if (m_Pause || audio_fifo_low || video_fifo_low)

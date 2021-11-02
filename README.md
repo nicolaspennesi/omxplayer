@@ -49,7 +49,7 @@ Build with
     make -j$(nproc)
 
 Install with
-    
+
     sudo make install
 
 ## CROSS COMPILING
@@ -133,6 +133,7 @@ Usage: omxplayer [OPTIONS] [FILE]
         --user-agent 'ua'       Send specified User-Agent as part of HTTP requests
         --lavfdopts 'opts'      Options passed to libavformat, e.g. 'probesize:250000,...'
         --avdict 'opts'         Options passed to demuxer, e.g., 'rtsp_transport:tcp,...'
+        --start-paused          Immediately pause the video after loading, will wait for dbus or key command to play
 
 For example:
 
@@ -211,7 +212,7 @@ For example:
     EXIT:esc
     PAUSE:p
     #Note that this next line has a space after the :
-    PAUSE: 
+    PAUSE:
     REWIND:left
     SEEK_FORWARD_SMALL:hex 0x4f43
     EXIT:q
@@ -448,7 +449,7 @@ or an empty string.
 
    Params       |   Type
 :-------------: | ----------
- Return         | `string[]` 
+ Return         | `string[]`
 
 ##### ListAudio
 
@@ -464,7 +465,7 @@ example of a possible string is:
 
    Params       |   Type
 :-------------: | ----------
- Return         | `string[]` 
+ Return         | `string[]`
 
 ##### ListVideo
 
@@ -480,7 +481,7 @@ example of a possible string is:
 
    Params       |   Type
 :-------------: | ----------
- Return         | `string[]` 
+ Return         | `string[]`
 
 ##### SelectSubtitle
 
@@ -505,7 +506,7 @@ Selects the audio stream at a given index.
 
 Turns on subtitles.
 
-   Params       |   Type 
+   Params       |   Type
 :-------------: | -------
  Return         | `null`
 
@@ -513,7 +514,7 @@ Turns on subtitles.
 
 Turns off subtitles.
 
-   Params       |   Type 
+   Params       |   Type
 :-------------: | -------
  Return         | `null`
 
@@ -535,7 +536,7 @@ Execute a "keyboard" command.  For available codes, see
    Params       |   Type    | Description
 :-------------: | ----------| ------------------
  1              | `int32`   | Command to execute
- Return         | `null`    | 
+ Return         | `null`    |
 
 
 #### Properties
@@ -712,4 +713,3 @@ Returns the total length of the playing media.
    Params       |   Type    | Description
 :-------------: | --------- | ----------------------------
  Return         | `int64`   | Total length in microseconds
-
